@@ -38,6 +38,7 @@ jobs:
       - name: Check out
         uses: actions/checkout@v4
         with:
+          submodules: false
           fetch-depth: ${{ github.event_name == 'workflow_dispatch' && 0 || 1 }}
           ref: ${{ github.event.inputs.tag || github.ref }}
 
