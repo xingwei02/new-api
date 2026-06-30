@@ -112,8 +112,23 @@ jobs:
 
     steps:
       - name: Set version
-        run: |          
-         if [ -n "${{ github.event.inputs.tag }}" ]; then             TAG="${{ github.event.inputs.tag }}"           else             TAG="${GITHUB_REF_NAME}"           fi           echo "TAG=${TAG}" >> $GITHUB_ENV           echo "Using tag: ${TAG}"
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ -n "${{ github.event.inputs.tag }}" ]; then
+            TAG="${{ github.event.inputs.tag }}"
+          else
+            TAG="${GITHUB_REF_NAME}"
+          fi
+
+          if [ -z "${TAG}" ]; then
+            echo "::error::Unable to resolve Docker image tag"
+            exit 1
+          fi
+
+          echo "TAG=${TAG}" >> $GITHUB_ENV
+          echo "Using tag: ${TAG}"
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
@@ -121,22 +136,37 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Create & push manifest (version)
+      - name: Verify arch images exist
+        shell: bash
         run: |
+          set -euo pipefail
+          docker buildx imagetools inspect opentokens/new-api:${TAG}-amd64 >/dev/null
+          docker buildx imagetools inspect opentokens/new-api:${TAG}-arm64 >/dev/null
+          docker buildx imagetools inspect opentokens/new-api:latest-amd64 >/dev/null
+          docker buildx imagetools inspect opentokens/new-api:latest-arm64 >/dev/null
+
+      - name: Create & push manifest (version)
+        shell: bash
+        run: |
+          set -euo pipefail
           docker buildx imagetools create \
             -t opentokens/new-api:${TAG} \
             opentokens/new-api:${TAG}-amd64 \
             opentokens/new-api:${TAG}-arm64
 
       - name: Create & push manifest (latest)
+        shell: bash
         run: |
+          set -euo pipefail
           docker buildx imagetools create \
             -t opentokens/new-api:latest \
             opentokens/new-api:latest-amd64 \
             opentokens/new-api:latest-arm64
 
       - name: Manifest summary
+        shell: bash
         run: |
+          set -euo pipefail
           echo "### Multi-arch Manifest" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
           docker buildx imagetools inspect opentokens/new-api:${TAG} >> $GITHUB_STEP_SUMMARY
