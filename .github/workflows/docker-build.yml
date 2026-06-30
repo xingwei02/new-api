@@ -112,7 +112,8 @@ jobs:
 
     steps:
       - name: Set version
-        run: echo "TAG=${{ needs.build_single_arch.outputs.tag }}" >> $GITHUB_ENV
+        run: |          
+         if [ -n "${{ github.event.inputs.tag }}" ]; then             TAG="${{ github.event.inputs.tag }}"           else             TAG="${GITHUB_REF_NAME}"           fi           echo "TAG=${TAG}" >> $GITHUB_ENV           echo "Using tag: ${TAG}"
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
