@@ -94,9 +94,9 @@ export function useTopNavLinks(): TopNavLink[] {
     }
   }
 
-  // About
+  // About / recruitment plan
   if (modules?.about !== false) {
-    links.push({ title: t('About'), href: '/about' })
+    links.push({ title: '主理人招募计划', href: '/about' })
   }
 
   return links
