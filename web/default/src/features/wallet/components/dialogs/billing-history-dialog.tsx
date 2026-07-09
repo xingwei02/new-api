@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useState } from 'react'
-import { Search, Copy, Check, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Search, Copy, Check, ChevronLeft, ChevronRight, Plus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { formatCurrencyFromUSD } from '@/lib/currency'
 import { formatNumber } from '@/lib/format'
@@ -47,6 +47,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog } from '@/components/dialog'
 import { StatusBadge } from '@/components/status-badge'
 import { useBillingHistory } from '../../hooks/use-billing-history'
+import { useWaffoPancakePayment } from '../../hooks/use-waffo-pancake-payment'
 import {
   getStatusConfig,
   getPaymentMethodName,
@@ -71,15 +72,22 @@ export function BillingHistoryDialog({
     keyword,
     loading,
     completing,
+    creatingPending,
     isAdmin,
     handlePageChange,
     handlePageSizeChange,
     handleSearch,
+    handleCreatePendingOrder,
     handleCompleteOrder,
   } = useBillingHistory()
 
   const [confirmTradeNo, setConfirmTradeNo] = useState<string | null>(null)
+  const [pendingUserId, setPendingUserId] = useState('')
+  const [pendingAmount, setPendingAmount] = useState('')
+  const [pendingMoney, setPendingMoney] = useState('')
   const { copyToClipboard, copiedText } = useCopyToClipboard({ notify: false })
+  const { processing: payingPending, processWaffoPancakePayment } =
+    useWaffoPancakePayment()
 
   const totalPages = Math.ceil(total / pageSize)
 
@@ -90,6 +98,23 @@ export function BillingHistoryDialog({
         setConfirmTradeNo(null)
       }
     }
+  }
+
+  const handleCreatePending = async () => {
+    const success = await handleCreatePendingOrder(
+      Number(pendingUserId),
+      Number(pendingAmount),
+      Number(pendingMoney)
+    )
+    if (success) {
+      setPendingUserId('')
+      setPendingAmount('')
+      setPendingMoney('')
+    }
+  }
+
+  const handlePayPendingOrder = async (tradeNo: string, amount: number) => {
+    await processWaffoPancakePayment(amount, tradeNo)
   }
 
   return (
@@ -106,6 +131,53 @@ export function BillingHistoryDialog({
         bodyClassName='space-y-3'
       >
         <div className='min-h-0 space-y-3'>
+          {isAdmin && (
+            <div className='rounded-lg border p-3'>
+              <div className='mb-2 text-sm font-medium'>
+                {t('Create pending Waffo Pancake order')}
+              </div>
+              <div className='grid gap-2 sm:grid-cols-4'>
+                <Input
+                  type='number'
+                  min='1'
+                  placeholder={t('User ID')}
+                  value={pendingUserId}
+                  onChange={(e) => setPendingUserId(e.target.value)}
+                  className='h-9'
+                />
+                <Input
+                  type='number'
+                  min='1'
+                  placeholder={t('Amount')}
+                  value={pendingAmount}
+                  onChange={(e) => setPendingAmount(e.target.value)}
+                  className='h-9'
+                />
+                <Input
+                  type='number'
+                  min='0.01'
+                  step='0.01'
+                  placeholder={t('Payment')}
+                  value={pendingMoney}
+                  onChange={(e) => setPendingMoney(e.target.value)}
+                  className='h-9'
+                />
+                <Button
+                  size='sm'
+                  onClick={handleCreatePending}
+                  disabled={creatingPending}
+                  className='h-9'
+                >
+                  <Plus className='mr-1 h-4 w-4' />
+                  {creatingPending ? t('Creating...') : t('Create')}
+                </Button>
+              </div>
+              <p className='text-muted-foreground mt-2 text-xs'>
+                {t('Only Waffo Pancake is supported in this version.')}
+              </p>
+            </div>
+          )}
+
           {/* Search and Filter Bar */}
           <div className='flex items-center gap-2'>
             <div className='relative flex-1'>
@@ -256,17 +328,30 @@ export function BillingHistoryDialog({
                         </div>
                       </div>
 
-                      {/* Admin Actions */}
-                      {isAdmin && record.status === 'pending' && (
-                        <div className='mt-4 flex justify-end'>
-                          <Button
-                            size='sm'
-                            variant='outline'
-                            onClick={() => setConfirmTradeNo(record.trade_no)}
-                            disabled={completing}
-                          >
-                            {t('Complete Order')}
-                          </Button>
+                      {/* Pending Order Actions */}
+                      {record.status === 'pending' && (
+                        <div className='mt-4 flex flex-wrap justify-end gap-2'>
+                          {record.payment_provider === 'waffo_pancake' && (
+                            <Button
+                              size='sm'
+                              onClick={() =>
+                                handlePayPendingOrder(record.trade_no, record.amount)
+                              }
+                              disabled={payingPending}
+                            >
+                              {payingPending ? t('Processing...') : t('Pay Now')}
+                            </Button>
+                          )}
+                          {isAdmin && (
+                            <Button
+                              size='sm'
+                              variant='outline'
+                              onClick={() => setConfirmTradeNo(record.trade_no)}
+                              disabled={completing}
+                            >
+                              {t('Complete Order')}
+                            </Button>
+                          )}
                         </div>
                       )}
                     </div>

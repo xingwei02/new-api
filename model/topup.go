@@ -3,6 +3,7 @@ package model
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/logger"
@@ -42,9 +43,10 @@ const (
 )
 
 var (
-	ErrPaymentMethodMismatch = errors.New("payment method mismatch")
-	ErrTopUpNotFound         = errors.New("topup not found")
-	ErrTopUpStatusInvalid    = errors.New("topup status invalid")
+	ErrPaymentMethodMismatch      = errors.New("payment method mismatch")
+	ErrTopUpNotFound              = errors.New("topup not found")
+	ErrTopUpStatusInvalid         = errors.New("topup status invalid")
+	ErrUnsupportedPaymentProvider = errors.New("unsupported payment provider")
 )
 
 func (topUp *TopUp) Insert() error {
@@ -77,6 +79,70 @@ func GetTopUpByTradeNo(tradeNo string) *TopUp {
 		return nil
 	}
 	return topUp
+}
+
+type AdminPendingTopUpInput struct {
+	UserID          int
+	Amount          int64
+	Money           float64
+	PaymentProvider string
+}
+
+func paymentMethodForProvider(paymentProvider string) (string, error) {
+	switch paymentProvider {
+	case PaymentProviderWaffoPancake:
+		return PaymentMethodWaffoPancake, nil
+	default:
+		return "", ErrUnsupportedPaymentProvider
+	}
+}
+
+func CreateAdminPendingTopUp(input *AdminPendingTopUpInput) (*TopUp, error) {
+	if input == nil || input.UserID <= 0 || input.Amount <= 0 || input.Money <= 0 {
+		return nil, errors.New("参数错误")
+	}
+	paymentMethod, err := paymentMethodForProvider(input.PaymentProvider)
+	if err != nil {
+		return nil, err
+	}
+	var count int64
+	if err := DB.Model(&User{}).Where("id = ?", input.UserID).Count(&count).Error; err != nil {
+		return nil, err
+	}
+	if count == 0 {
+		return nil, errors.New("用户不存在")
+	}
+	topUp := &TopUp{
+		UserId:          input.UserID,
+		Amount:          input.Amount,
+		Money:           input.Money,
+		TradeNo:         fmt.Sprintf("ADMIN-%s-%d-%d", input.PaymentProvider, input.UserID, time.Now().UnixNano()),
+		PaymentMethod:   paymentMethod,
+		PaymentProvider: input.PaymentProvider,
+		CreateTime:      common.GetTimestamp(),
+		Status:          common.TopUpStatusPending,
+	}
+	if err := topUp.Insert(); err != nil {
+		return nil, err
+	}
+	return topUp, nil
+}
+
+func GetPendingTopUpForUserPayment(tradeNo string, userID int, expectedPaymentProvider string) (*TopUp, error) {
+	if tradeNo == "" || userID <= 0 {
+		return nil, errors.New("参数错误")
+	}
+	topUp := &TopUp{}
+	if err := DB.Where("trade_no = ? AND user_id = ?", tradeNo, userID).First(topUp).Error; err != nil {
+		return nil, ErrTopUpNotFound
+	}
+	if expectedPaymentProvider != "" && topUp.PaymentProvider != expectedPaymentProvider {
+		return nil, ErrPaymentMethodMismatch
+	}
+	if topUp.Status != common.TopUpStatusPending {
+		return nil, ErrTopUpStatusInvalid
+	}
+	return topUp, nil
 }
 
 func UpdatePendingTopUpStatus(tradeNo string, expectedPaymentProvider string, targetStatus string) error {

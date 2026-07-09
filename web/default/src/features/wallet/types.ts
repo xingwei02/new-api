@@ -201,7 +201,9 @@ export interface WaffoPaymentRequest {
  */
 export interface WaffoPancakePaymentRequest {
   /** Topup amount */
-  amount: number
+  amount?: number
+  /** Existing pending order number to pay */
+  trade_no?: string
 }
 
 /**
@@ -265,6 +267,8 @@ export interface TopupRecord {
   trade_no: string
   /** Payment method type */
   payment_method: string
+  /** Payment provider/gateway */
+  payment_provider?: string
   /** Creation timestamp */
   create_time: number
   /** Completion timestamp */
@@ -286,4 +290,14 @@ export interface BillingHistoryResponse {
  */
 export interface CompleteOrderRequest {
   trade_no: string
+}
+
+/**
+ * Create pending topup order request (admin only)
+ */
+export interface CreatePendingTopupRequest {
+  user_id: number
+  amount: number
+  money: number
+  payment_provider?: 'waffo_pancake'
 }

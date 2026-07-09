@@ -1,4 +1,4 @@
-name: Publish Docker image (Multi-arch)
+name: Publish Docker image (Linux amd64)
 
 on:
   push:
@@ -8,26 +8,14 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag name to build (e.g., v0.10.8-alpha.3)'
+        description: 'Tag name to build (e.g., V1.0.5)'
         required: true
         type: string
 
 jobs:
-  build_single_arch:
-    name: Build & push (${{ matrix.arch }})
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - arch: amd64
-            platform: linux/amd64
-            runner: ubuntu-latest
-          - arch: arm64
-            platform: linux/arm64
-            runner: ubuntu-24.04-arm
-    runs-on: ${{ matrix.runner }}
-    outputs:
-      tag: ${{ steps.version.outputs.tag }}
+  build_amd64:
+    name: Build & push linux/amd64
+    runs-on: ubuntu-latest
 
     permissions:
       packages: write
@@ -44,7 +32,9 @@ jobs:
 
       - name: Resolve tag & write VERSION
         id: version
+        shell: bash
         run: |
+          set -euo pipefail
           if [ -n "${{ github.event.inputs.tag }}" ]; then
             TAG="${{ github.event.inputs.tag }}"
             if ! git rev-parse "refs/tags/$TAG" >/dev/null 2>&1; then
@@ -54,10 +44,10 @@ jobs:
           else
             TAG=${GITHUB_REF#refs/tags/}
           fi
-          echo "TAG=${TAG}" >> $GITHUB_ENV
-          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "TAG=${TAG}" >> "$GITHUB_ENV"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
           echo "${TAG}" > VERSION
-          echo "Building tag: ${TAG} for ${{ matrix.arch }}"
+          echo "Building linux/amd64 image tag: ${TAG}"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -74,100 +64,25 @@ jobs:
         with:
           images: opentokens/new-api-yes
 
-      - name: Build & push
+      - name: Build & push linux/amd64 image
         id: build
         uses: docker/build-push-action@v6
         with:
           context: .
-          platforms: ${{ matrix.platform }}
+          platforms: linux/amd64
           push: true
-          tags: |
-            opentokens/new-api-yes:${{ env.TAG }}-${{ matrix.arch }}
-            opentokens/new-api-yes:latest-${{ matrix.arch }}
+          tags: opentokens/new-api-yes:${{ env.TAG }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          provenance: mode=max
-          sbom: true
-
-      - name: Install cosign
-        uses: sigstore/cosign-installer@v3
-
-      - name: Sign image with cosign
-        run: cosign sign --yes opentokens/new-api-yes@${{ steps.build.outputs.digest }}
+          provenance: false
+          sbom: false
 
       - name: Image summary
-        run: |
-          echo "### Docker Image Digest (${{ matrix.arch }})" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          echo "opentokens/new-api-yes:${TAG}-${{ matrix.arch }}" >> $GITHUB_STEP_SUMMARY
-          echo "${{ steps.build.outputs.digest }}" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-
-  create_manifests:
-    name: Create multi-arch manifests
-    needs: [build_single_arch]
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
-
-    steps:
-      - name: Set version
         shell: bash
         run: |
-          set -euo pipefail
-
-          if [ -n "${{ github.event.inputs.tag }}" ]; then
-            TAG="${{ github.event.inputs.tag }}"
-          else
-            TAG="${GITHUB_REF_NAME}"
-          fi
-
-          if [ -z "${TAG}" ]; then
-            echo "::error::Unable to resolve Docker image tag"
-            exit 1
-          fi
-
-          echo "TAG=${TAG}" >> $GITHUB_ENV
-          echo "Using tag: ${TAG}"
-
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Verify arch images exist
-        shell: bash
-        run: |
-          set -euo pipefail
-          docker buildx imagetools inspect opentokens/new-api-yes:${TAG}-amd64 >/dev/null
-          docker buildx imagetools inspect opentokens/new-api-yes:${TAG}-arm64 >/dev/null
-          docker buildx imagetools inspect opentokens/new-api-yes:latest-amd64 >/dev/null
-          docker buildx imagetools inspect opentokens/new-api-yes:latest-arm64 >/dev/null
-
-      - name: Create & push manifest (version)
-        shell: bash
-        run: |
-          set -euo pipefail
-          docker buildx imagetools create \
-            -t opentokens/new-api-yes:${TAG} \
-            opentokens/new-api-yes:${TAG}-amd64 \
-            opentokens/new-api-yes:${TAG}-arm64
-
-      - name: Create & push manifest (latest)
-        shell: bash
-        run: |
-          set -euo pipefail
-          docker buildx imagetools create \
-            -t opentokens/new-api-yes:latest \
-            opentokens/new-api-yes:latest-amd64 \
-            opentokens/new-api-yes:latest-arm64
-
-      - name: Manifest summary
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "### Multi-arch Manifest" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          docker buildx imagetools inspect opentokens/new-api-yes:${TAG} >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "### Docker Image Digest (linux/amd64)" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo "opentokens/new-api-yes:${TAG}" >> "$GITHUB_STEP_SUMMARY"
+          echo "${{ steps.build.outputs.digest }}" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"

@@ -23,6 +23,7 @@ import { useIsAdmin } from '@/hooks/use-admin'
 import {
   getUserBillingHistory,
   getAllBillingHistory,
+  createPendingTopupOrder,
   completeOrder,
   isApiSuccess,
 } from '../api'
@@ -50,6 +51,7 @@ export function useBillingHistory(options: UseBillingHistoryOptions = {}) {
   const [keyword, setKeyword] = useState('')
   const [loading, setLoading] = useState(false)
   const [completing, setCompleting] = useState(false)
+  const [creatingPending, setCreatingPending] = useState(false)
 
   /**
    * Fetch billing history
@@ -117,6 +119,47 @@ export function useBillingHistory(options: UseBillingHistoryOptions = {}) {
   )
 
   /**
+   * Create a pending Waffo Pancake order (admin only)
+   */
+  const handleCreatePendingOrder = useCallback(
+    async (userId: number, amount: number, money: number) => {
+      if (!isAdmin) {
+        toast.error(i18next.t('Admin access required'))
+        return false
+      }
+      if (!userId || userId <= 0 || !amount || amount <= 0 || !money || money <= 0) {
+        toast.error(i18next.t('Please enter a valid user ID, amount and payment amount'))
+        return false
+      }
+
+      setCreatingPending(true)
+      try {
+        const response = await createPendingTopupOrder({
+          user_id: Math.floor(userId),
+          amount: Math.floor(amount),
+          money,
+          payment_provider: 'waffo_pancake',
+        })
+        if (isApiSuccess(response)) {
+          toast.success(i18next.t('Pending order created successfully'))
+          await fetchBillingHistory()
+          return true
+        }
+        toast.error(response.message || i18next.t('Failed to create pending order'))
+        return false
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error('Failed to create pending order:', error)
+        toast.error(i18next.t('Failed to create pending order'))
+        return false
+      } finally {
+        setCreatingPending(false)
+      }
+    },
+    [isAdmin, fetchBillingHistory]
+  )
+
+  /**
    * Change page
    */
   const handlePageChange = useCallback((newPage: number) => {
@@ -152,10 +195,12 @@ export function useBillingHistory(options: UseBillingHistoryOptions = {}) {
     keyword,
     loading,
     completing,
+    creatingPending,
     isAdmin,
     handlePageChange,
     handlePageSizeChange,
     handleSearch,
+    handleCreatePendingOrder,
     handleCompleteOrder,
     refresh: fetchBillingHistory,
   }

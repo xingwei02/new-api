@@ -491,6 +491,36 @@ type AdminCompleteTopupRequest struct {
 	TradeNo string `json:"trade_no"`
 }
 
+type AdminCreatePendingTopUpRequest struct {
+	UserID          int     `json:"user_id"`
+	Amount          int64   `json:"amount"`
+	Money           float64 `json:"money"`
+	PaymentProvider string  `json:"payment_provider"`
+}
+
+// AdminCreatePendingTopUp 管理员创建待支付订单（第一版仅支持 Waffo Pancake）
+func AdminCreatePendingTopUp(c *gin.Context) {
+	var req AdminCreatePendingTopUpRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		common.ApiErrorMsg(c, "参数错误")
+		return
+	}
+	if req.PaymentProvider == "" {
+		req.PaymentProvider = model.PaymentProviderWaffoPancake
+	}
+	order, err := model.CreateAdminPendingTopUp(&model.AdminPendingTopUpInput{
+		UserID:          req.UserID,
+		Amount:          req.Amount,
+		Money:           req.Money,
+		PaymentProvider: req.PaymentProvider,
+	})
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	common.ApiSuccess(c, order)
+}
+
 // AdminCompleteTopUp 管理员补单接口
 func AdminCompleteTopUp(c *gin.Context) {
 	var req AdminCompleteTopupRequest

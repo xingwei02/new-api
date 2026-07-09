@@ -32,6 +32,8 @@ import type {
   AffiliateTransferResponse,
   BillingHistoryResponse,
   CompleteOrderRequest,
+  CreatePendingTopupRequest,
+  TopupRecord,
   CreemPaymentRequest,
   CreemPaymentResponse,
   WaffoPaymentRequest,
@@ -231,5 +233,15 @@ export async function completeOrder(
   request: CompleteOrderRequest
 ): Promise<ApiResponse> {
   const res = await api.post('/api/user/topup/complete', request)
+  return res.data
+}
+
+/**
+ * Create a pending topup order (admin only)
+ */
+export async function createPendingTopupOrder(
+  request: CreatePendingTopupRequest
+): Promise<ApiResponse<TopupRecord>> {
+  const res = await api.post('/api/user/topup/pending', request)
   return res.data
 }
