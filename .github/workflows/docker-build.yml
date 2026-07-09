@@ -72,7 +72,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: opentokens/new-api
+          images: opentokens/new-api-yes
 
       - name: Build & push
         id: build
@@ -82,8 +82,8 @@ jobs:
           platforms: ${{ matrix.platform }}
           push: true
           tags: |
-            opentokens/new-api:${{ env.TAG }}-${{ matrix.arch }}
-            opentokens/new-api:latest-${{ matrix.arch }}
+            opentokens/new-api-yes:${{ env.TAG }}-${{ matrix.arch }}
+            opentokens/new-api-yes:latest-${{ matrix.arch }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -94,13 +94,13 @@ jobs:
         uses: sigstore/cosign-installer@v3
 
       - name: Sign image with cosign
-        run: cosign sign --yes opentokens/new-api@${{ steps.build.outputs.digest }}
+        run: cosign sign --yes opentokens/new-api-yes@${{ steps.build.outputs.digest }}
 
       - name: Image summary
         run: |
           echo "### Docker Image Digest (${{ matrix.arch }})" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
-          echo "opentokens/new-api:${TAG}-${{ matrix.arch }}" >> $GITHUB_STEP_SUMMARY
+          echo "opentokens/new-api-yes:${TAG}-${{ matrix.arch }}" >> $GITHUB_STEP_SUMMARY
           echo "${{ steps.build.outputs.digest }}" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
 
@@ -140,28 +140,28 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          docker buildx imagetools inspect opentokens/new-api:${TAG}-amd64 >/dev/null
-          docker buildx imagetools inspect opentokens/new-api:${TAG}-arm64 >/dev/null
-          docker buildx imagetools inspect opentokens/new-api:latest-amd64 >/dev/null
-          docker buildx imagetools inspect opentokens/new-api:latest-arm64 >/dev/null
+          docker buildx imagetools inspect opentokens/new-api-yes:${TAG}-amd64 >/dev/null
+          docker buildx imagetools inspect opentokens/new-api-yes:${TAG}-arm64 >/dev/null
+          docker buildx imagetools inspect opentokens/new-api-yes:latest-amd64 >/dev/null
+          docker buildx imagetools inspect opentokens/new-api-yes:latest-arm64 >/dev/null
 
       - name: Create & push manifest (version)
         shell: bash
         run: |
           set -euo pipefail
           docker buildx imagetools create \
-            -t opentokens/new-api:${TAG} \
-            opentokens/new-api:${TAG}-amd64 \
-            opentokens/new-api:${TAG}-arm64
+            -t opentokens/new-api-yes:${TAG} \
+            opentokens/new-api-yes:${TAG}-amd64 \
+            opentokens/new-api-yes:${TAG}-arm64
 
       - name: Create & push manifest (latest)
         shell: bash
         run: |
           set -euo pipefail
           docker buildx imagetools create \
-            -t opentokens/new-api:latest \
-            opentokens/new-api:latest-amd64 \
-            opentokens/new-api:latest-arm64
+            -t opentokens/new-api-yes:latest \
+            opentokens/new-api-yes:latest-amd64 \
+            opentokens/new-api-yes:latest-arm64
 
       - name: Manifest summary
         shell: bash
@@ -169,5 +169,5 @@ jobs:
           set -euo pipefail
           echo "### Multi-arch Manifest" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
-          docker buildx imagetools inspect opentokens/new-api:${TAG} >> $GITHUB_STEP_SUMMARY
+          docker buildx imagetools inspect opentokens/new-api-yes:${TAG} >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
